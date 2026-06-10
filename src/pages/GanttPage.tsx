@@ -23,6 +23,8 @@ import {
   Trash2,
   GripVertical,
   AlertTriangle,
+  Camera,
+  Download,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import Button from '@/components/Button';
@@ -42,6 +44,8 @@ import {
   snapToGrid,
 } from '@/utils/gantt';
 import { cn } from '@/lib/utils';
+// @ts-ignore
+import html2canvas from 'html2canvas';
 
 interface DraggedOrder {
   id: string;
@@ -66,6 +70,8 @@ export default function GanttPage() {
   const [dragPosition, setDragPosition] = useState<{ machineId: number; startTime: Date } | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [resizing, setResizing] = useState<{ id: number; startX: number; initialWidth: number; initialLeft: number } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
 
   const {
     schedules,
@@ -223,6 +229,36 @@ export default function GanttPage() {
       setDraggedItem(null);
       setDragPosition(null);
       clearConflict();
+    }
+  };
+
+  const handleExportImage = async () => {
+    if (!ganttRef.current || isExporting) return;
+
+    try {
+      setIsExporting(true);
+      setExportSuccess(false);
+
+      const container = ganttRef.current;
+      const canvas = await html2canvas(container, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const link = document.createElement('a');
+      link.download = `生产排程_${dayjs().format('YYYY-MM-DD_HH-mm')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3000);
+    } catch (error) {
+      console.error('导出图片失败:', error);
+      alert('导出图片失败，请重试');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -389,11 +425,38 @@ export default function GanttPage() {
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
+            <div className="flex items-center gap-1 bg-white rounded-lg shadow-sm p-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleExportImage}
+                disabled={isExporting}
+                title="导出为图片"
+              >
+                {isExporting ? (
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
+                ) : exportSuccess ? (
+                  <Download className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
         {conflictInfo?.hasConflict && (
           <ConflictAlert conflictInfo={conflictInfo} onClose={clearConflict} />
+        )}
+
+        {exportSuccess && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+            <Download className="w-5 h-5 text-green-500" />
+            <div>
+              <p className="font-medium text-green-800">导出成功！</p>
+              <p className="text-sm text-green-600">图片已下载，可用于周报或车间看板</p>
+            </div>
+          </div>
         )}
 
         <div className="flex-1 flex gap-4 min-h-0">
